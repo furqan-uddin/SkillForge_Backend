@@ -1,26 +1,13 @@
-// skillforge-backend/routes/authRoutes.js
+// routes/authRoutes.js
 import express from "express";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import authMiddleware from "../middlewares/authMiddleware.js"; // ✅ FIXED
 
 const router = express.Router();
 
-// ✅ JWT Middleware
-const authMiddleware = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Unauthorized" });
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: "Invalid token" });
-  }
-};
-
-// ✅ Register (Fixed – No double hashing)
+// ✅ Register
 router.post("/register", async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -34,7 +21,7 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Email already registered" });
     }
 
-    const newUser = new User({ name, email, password }); // Pre-save hook will hash automatically
+    const newUser = new User({ name, email, password });
     await newUser.save();
 
     res.status(201).json({ message: "User registered successfully" });
@@ -71,11 +58,7 @@ router.post("/login", async (req, res) => {
     res.json({
       message: "Login successful",
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
+      user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
     console.error("Login Error:", err);
@@ -83,7 +66,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// ✅ Reset Password (Fixed – No manual hash)
+// ✅ Reset Password
 router.post("/reset-password", async (req, res) => {
   try {
     const { email, newPassword } = req.body;
@@ -96,7 +79,7 @@ router.post("/reset-password", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.password = newPassword; // Pre-save hook will hash automatically
+    user.password = newPassword;
     await user.save();
 
     res.json({ message: "Password reset successfully!" });
@@ -109,18 +92,32 @@ router.post("/reset-password", async (req, res) => {
 // ✅ Save Career Interests
 router.post("/save-interests", authMiddleware, async (req, res) => {
   try {
-    const { interests } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { interests },
-      { new: true }
-    );
-    res.json({
-      message: "Interests saved successfully",
-      interests: user.interests,
-    });
+    let { interests } = req.body;
+
+    if (!Array.isArray(interests)) {
+      return res.status(400).json({ message: "Interests must be an array" });
+    }
+
+    interests = [
+      ...new Set(
+        interests
+          .map((i) => i.trim())
+          .filter((i) => i.length >= 3 && i.length <= 50 && /^[a-zA-Z\s\-\&]+$/.test(i))
+      ),
+    ];
+
+    if (interests.length > 20) {
+      return res.status(400).json({ message: "Maximum 20 interests allowed" });
+    }
+
+    const user = await User.findByIdAndUpdate(req.userId, { interests }, { new: true });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "✅ Interests saved successfully", interests: user.interests });
   } catch (error) {
-    console.error(error);
+    console.error("Error saving interests:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -129,6 +126,7 @@ router.post("/save-interests", authMiddleware, async (req, res) => {
 router.get("/get-interests", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("interests");
+    if (!user) return res.status(404).json({ message: "User not found" });
     res.json({ interests: user.interests || [] });
   } catch (error) {
     console.error(error);
