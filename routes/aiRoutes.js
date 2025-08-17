@@ -22,6 +22,6 @@ const upload = multer({
 });
 
 router.post("/generate-roadmap", authMiddleware, generateRoadmap);
-router.post("/analyze-resume", upload.single("file"), analyzeResume);
+router.post("/analyze-resume",upload.single("file"), analyzeResume);
 
 export default router;

@@ -1,6 +1,6 @@
 // controllers/aiController.js
 import fs from "fs";
-import { PDFDocument } from "pdf-lib";
+import pdfParse from "pdf-parse-fixed";
 import mammoth from "mammoth";
 import Groq from "groq-sdk";
 import User from "../models/User.js";
@@ -8,6 +8,7 @@ import User from "../models/User.js";
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ✅ AI Roadmap Generator
+// ✅ Optimized AI Roadmap Generator (Detailed + JSON strict)
 export const generateRoadmap = async (req, res) => {
   const { interests } = req.body;
 
@@ -16,28 +17,45 @@ export const generateRoadmap = async (req, res) => {
       return res.status(400).json({ error: "No interests provided" });
     }
 
-    const roadmaps = {};
+    const prompt = `
+You are an expert career mentor. Create a detailed learning roadmap for each user interest.
+- Each roadmap must cover at least 6 weeks.
+- Each week should have exactly 4 learning steps (clear, actionable, increasing depth).
+- Return strictly in JSON format like this:
+{
+  "Interest Name": {
+    "Week 1": ["Step 1", "Step 2", "Step 3", "Step 4"],
+    "Week 2": ["Step 1", "Step 2", "Step 3", "Step 4"],
+    ...
+  }
+}
+User interests: ${interests.join(", ")}
+`;
 
-    for (const interest of interests) {
-      const completion = await groq.chat.completions.create({
-        model: "llama3-8b-8192",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert career mentor. Generate a clear 6-week step-by-step learning roadmap. Each step should be concise (1-2 lines).",
-          },
-          {
-            role: "user",
-            content: `Generate a 6-week learning roadmap for: ${interest}.`,
-          },
-        ],
-      });
 
-      roadmaps[interest] =
-        completion.choices[0].message.content
-          .split("\n")
-          .filter((line) => line.trim() !== "");
+    const completion = await groq.chat.completions.create({
+      model: "llama3-8b-8192",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a professional mentor. Always respond with strict JSON only — no markdown, no text outside JSON.",
+        },
+        { role: "user", content: prompt },
+      ],
+    });
+
+    let aiResponse = completion.choices[0].message.content;
+
+    let roadmaps = {};
+    try {
+      roadmaps = JSON.parse(aiResponse);
+    } catch (err) {
+      console.warn("AI response was not valid JSON, attempting fallback parse...");
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        roadmaps = JSON.parse(jsonMatch[0]);
+      }
     }
 
     await User.findByIdAndUpdate(req.userId, { roadmapProgress: 10 });
@@ -49,10 +67,13 @@ export const generateRoadmap = async (req, res) => {
   }
 };
 
-// ✅ Resume Analyzer
+
+
+
+// ✅ Resume Analyzer (fixed PDF extraction)
 export const analyzeResume = async (req, res) => {
   let extractedText = "";
-  const userId = req.body.userId;
+  const userId = req.userId;
 
   try {
     if (req.file) {
@@ -60,14 +81,12 @@ export const analyzeResume = async (req, res) => {
 
       if (req.file.mimetype === "application/pdf") {
         const dataBuffer = fs.readFileSync(filePath);
-        const pdfDoc = await PDFDocument.load(dataBuffer);
-        const pages = pdfDoc.getPages();
-        for (const page of pages) {
-          const textContent = await page.getTextContent();
-          const text = textContent.items.map((item) => item.str).join(" ");
-          extractedText += text + "\n";
-        }
-      } else if (req.file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        const pdfData = await pdfParse(dataBuffer);
+        extractedText = pdfData.text || "";
+      }else if (
+        req.file.mimetype ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ) {
         const result = await mammoth.extractRawText({ path: filePath });
         extractedText = result.value;
       }
@@ -86,7 +105,8 @@ export const analyzeResume = async (req, res) => {
       messages: [
         {
           role: "system",
-          content: "You are a professional resume reviewer. Give a score (0-100) and 3-5 suggestions.",
+          content:
+            "You are a professional resume reviewer. Give a score (0-100) and 3-5 suggestions.",
         },
         { role: "user", content: extractedText },
       ],
@@ -94,7 +114,9 @@ export const analyzeResume = async (req, res) => {
 
     const aiResponse = completion.choices[0].message.content;
     const scoreMatch = aiResponse.match(/(\d{1,3})/);
-    const score = scoreMatch ? Math.min(100, parseInt(scoreMatch[1])) : 50;
+    const score = scoreMatch
+      ? Math.min(100, parseInt(scoreMatch[1]))
+      : 50;
 
     let suggestionsArray = aiResponse
       .split(/\n|•|-/)

@@ -21,7 +21,8 @@
     "mongoose": "^8.16.1",
     "multer": "^2.0.2",
     "openai": "^5.8.2",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "pdf-parse-fixed": "^1.1.1"
   },
   "description": ""
 }
