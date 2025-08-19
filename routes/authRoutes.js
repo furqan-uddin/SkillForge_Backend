@@ -7,7 +7,6 @@ import {
   resetPassword,
   saveInterests,
   getInterests,
-  getUserProfile,
 } from "../controllers/authController.js";
 
 const router = express.Router();
@@ -17,6 +16,5 @@ router.post("/login", loginUser);
 router.post("/reset-password", resetPassword);
 router.post("/save-interests", authMiddleware, saveInterests);
 router.get("/get-interests", authMiddleware, getInterests);
-router.get("/me", authMiddleware, getUserProfile);
 
 export default router;
