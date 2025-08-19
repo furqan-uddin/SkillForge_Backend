@@ -83,9 +83,9 @@ export const analyzeResume = async (req, res) => {
         const dataBuffer = fs.readFileSync(filePath);
         const pdfData = await pdfParse(dataBuffer);
         extractedText = pdfData.text || "";
-      }else if (
-        req.file.mimetype ===
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      } else if (
+        req.file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        req.file.mimetype === "application/msword"
       ) {
         const result = await mammoth.extractRawText({ path: filePath });
         extractedText = result.value;
@@ -100,28 +100,59 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "No resume text found!" });
     }
 
+    // 🔹 Force AI to return valid JSON (score + suggestions[])
     const completion = await groq.chat.completions.create({
       model: "llama3-8b-8192",
       messages: [
         {
           role: "system",
-          content:
-            "You are a professional resume reviewer. Give a score (0-100) and 3-5 suggestions.",
+          content: `You are an expert resume reviewer.
+Respond ONLY in valid JSON format with the structure:
+{
+  "score": <number between 0-100>,
+  "suggestions": [
+    "Use measurable achievements (e.g., increased sales by 20%).",
+    "Tailor keywords to match the target job description.",
+    "Shorten lengthy sentences for readability."
+  ]
+}
+
+Scoring criteria:
+- Clarity & readability
+- Use of strong action verbs
+- Quantifiable impact (numbers, percentages, metrics)
+- Relevance to target role
+- Overall structure & formatting
+
+Make all suggestions specific, concise, and directly actionable (avoid vague advice).`
+
         },
         { role: "user", content: extractedText },
       ],
     });
 
     const aiResponse = completion.choices[0].message.content;
-    const scoreMatch = aiResponse.match(/(\d{1,3})/);
-    const score = scoreMatch
-      ? Math.min(100, parseInt(scoreMatch[1]))
-      : 50;
 
-    let suggestionsArray = aiResponse
-      .split(/\n|•|-/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 5 && !/score/i.test(s));
+    let score = 50;
+    let suggestionsArray = [];
+
+    try {
+      const parsed = JSON.parse(aiResponse);
+      score = Math.min(100, parsed.score || 50);
+      suggestionsArray = Array.isArray(parsed.suggestions)
+        ? parsed.suggestions
+        : [];
+    } catch (err) {
+      console.error("Resume JSON parse failed, falling back:", err);
+
+      // Fallback: try to salvage useful text
+      const scoreMatch = aiResponse.match(/(\d{1,3})/);
+      score = scoreMatch ? Math.min(100, parseInt(scoreMatch[1])) : 50;
+      suggestionsArray = aiResponse
+        .split(/\n|•|-/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 5 && !/score/i.test(s));
+    }
 
     if (suggestionsArray.length === 0) {
       suggestionsArray = [
