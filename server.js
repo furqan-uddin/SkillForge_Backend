@@ -8,6 +8,7 @@ import authRoutes from "./routes/authRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import roadmapRoutes from "./routes/roadmapRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -20,6 +21,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api", aiRoutes); // ✅ All AI routes prefixed with /api
+app.use("/api/roadmaps", roadmapRoutes); // ✅ NEW: roadmap persistence & progress
 
 // ✅ Connect DB & Start Server
 const PORT = process.env.PORT || 5000;

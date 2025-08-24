@@ -102,8 +102,8 @@ export const saveInterests = async (req, res) => {
       ),
     ];
 
-    if (interests.length > 20) {
-      return res.status(400).json({ message: "Maximum 20 interests allowed" });
+    if (interests.length > 10) {
+      return res.status(400).json({ message: "Maximum 10 interests allowed" });
     }
 
     const user = await User.findByIdAndUpdate(req.userId, { interests }, { new: true });
