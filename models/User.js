@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema({
 
   // ✅ NEW fields for Dashboard progress
   resumeScore: { type: Number, default: 0 },
-  roadmapProgress: { type: Number, default: 0 }
+  // roadmapProgress: { type: Number, default: 0 }
 });
 
 // ✅ Hash password before saving

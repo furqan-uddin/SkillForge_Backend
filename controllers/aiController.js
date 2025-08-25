@@ -4,11 +4,13 @@ import pdfParse from "pdf-parse-fixed";
 import mammoth from "mammoth";
 import Groq from "groq-sdk";
 import User from "../models/User.js";
+import { jsonrepair } from "jsonrepair";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ✅ AI Roadmap Generator
 // ✅ Optimized AI Roadmap Generator (Detailed + JSON strict)
+
 export const generateRoadmap = async (req, res) => {
   const { interests } = req.body;
 
@@ -21,17 +23,16 @@ export const generateRoadmap = async (req, res) => {
 You are an expert career mentor. Create a detailed learning roadmap for each user interest.
 - Each roadmap must cover at least 6 weeks.
 - Each week should have exactly 4 learning steps (clear, actionable, increasing depth).
-- Return strictly in JSON format like this:
+- Output ONLY valid JSON (no markdown, no comments, no text).
+Format:
 {
   "Interest Name": {
     "Week 1": ["Step 1", "Step 2", "Step 3", "Step 4"],
-    "Week 2": ["Step 1", "Step 2", "Step 3", "Step 4"],
-    ...
+    "Week 2": ["Step 1", "Step 2", "Step 3", "Step 4"]
   }
 }
 User interests: ${interests.join(", ")}
 `;
-
 
     const completion = await groq.chat.completions.create({
       model: "llama3-8b-8192",
@@ -39,7 +40,7 @@ User interests: ${interests.join(", ")}
         {
           role: "system",
           content:
-            "You are a professional mentor. Always respond with strict JSON only — no markdown, no text outside JSON.",
+            "You are a JSON generator. Respond ONLY with valid JSON. No explanations, no markdown, no extra text.",
         },
         { role: "user", content: prompt },
       ],
@@ -51,12 +52,18 @@ User interests: ${interests.join(", ")}
     try {
       roadmaps = JSON.parse(aiResponse);
     } catch (err) {
-      console.warn("AI response was not valid JSON, attempting fallback parse...");
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        roadmaps = JSON.parse(jsonMatch[0]);
-      }
+      console.warn("AI response invalid, attempting repair...");
+      roadmaps = JSON.parse(jsonrepair(aiResponse));
     }
+
+    // ✅ Schema validation
+    Object.values(roadmaps).forEach((weeks) => {
+      for (const [week, steps] of Object.entries(weeks)) {
+        if (!Array.isArray(steps) || steps.length !== 4) {
+          throw new Error(`Invalid roadmap format at ${week}`);
+        }
+      }
+    });
 
     await User.findByIdAndUpdate(req.userId, { roadmapProgress: 10 });
 

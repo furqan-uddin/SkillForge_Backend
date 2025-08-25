@@ -1,4 +1,5 @@
 // controllers/roadmapController.js
+import User from "../models/User.js";
 import Roadmap from "../models/Roadmap.js";
 import ProgressLog from "../models/ProgressLog.js";
 
@@ -66,6 +67,11 @@ export const createOrReplaceRoadmap = async (req, res) => {
 
     const progress = roadmap.progressPercent();
     await upsertTodayLog(req.userId, roadmap._id, progress);
+    // 👇 Add interest to user if missing
+    await User.updateOne(
+      { _id: req.userId },
+      { $addToSet: { interests: interest } }  // avoids duplicates
+    );
 
     return res.json({ roadmap: withProgress(roadmap) });
   } catch (err) {
@@ -181,6 +187,7 @@ export const getStreaks = async (req, res) => {
 };
 
 // DELETE /api/roadmaps/:id
+// DELETE /api/roadmaps/:id
 export const deleteRoadmap = async (req, res) => {
   try {
     const roadmap = await Roadmap.findOneAndDelete({
@@ -191,7 +198,27 @@ export const deleteRoadmap = async (req, res) => {
     if (!roadmap) {
       return res.status(404).json({ message: "Roadmap not found" });
     }
-    return res.json({ message: "✅ Roadmap deleted successfully" });
+
+    // 🧹 Clean up ProgressLog entries linked to this roadmap
+    await ProgressLog.deleteMany({
+      userId: req.userId,
+      roadmapId: roadmap._id,
+    });
+
+    // 👇 Check if user has any roadmap left for this interest
+    const stillExists = await Roadmap.exists({
+      userId: req.userId,
+      interest: roadmap.interest,
+    });
+
+    if (!stillExists) {
+      await User.updateOne(
+        { _id: req.userId },
+        { $pull: { interests: roadmap.interest } }
+      );
+    }
+
+    return res.json({ message: "✅ Roadmap & related logs deleted successfully" });
   } catch (error) {
     console.error("deleteRoadmap error:", error);
     return res.status(500).json({ message: "Server error" });
