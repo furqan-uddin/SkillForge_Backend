@@ -16,6 +16,15 @@ const userSchema = new mongoose.Schema({
   // ✅ NEW fields for Dashboard progress
   resumeScore: { type: Number, default: 0 },
   // roadmapProgress: { type: Number, default: 0 }
+  badges: {
+    type: [String],
+    default: []
+  },
+  resumeText: {
+    type: String,
+    default: "",
+  },
+
 });
 
 // ✅ Hash password before saving

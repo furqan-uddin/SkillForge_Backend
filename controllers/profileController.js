@@ -46,6 +46,7 @@ export const getLoggedInUser = async (req, res) => {
       profilePic: user.profilePic,
       resumeScore: user.resumeScore,
       interests: user.interests || [],
+      badges: user.badges || [],   // 🔥 always return badges
       roadmapProgress,
       currentStreak: current || 0,
       longestStreak: longest || 0,
@@ -71,5 +72,13 @@ export const updateProfile = async (req, res) => {
   } catch (error) {
     console.error("Profile Update Error:", error);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const assignBadge = async (userId, badge) => {
+  const user = await User.findById(userId);
+  if (user && !user.badges.includes(badge)) {
+    user.badges.push(badge);
+    await user.save();
   }
 };

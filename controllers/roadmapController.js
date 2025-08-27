@@ -2,6 +2,8 @@
 import User from "../models/User.js";
 import Roadmap from "../models/Roadmap.js";
 import ProgressLog from "../models/ProgressLog.js";
+import { assignBadge } from "./profileController.js";
+
 
 /** Normalize AI JSON -> {interest, weeks:[{title, steps:[{text}]}]} */
 const normalizeWeeks = (weeksObjectOrArray) => {
@@ -128,7 +130,9 @@ export const toggleStep = async (req, res) => {
 
     const progress = roadmap.progressPercent();
     await upsertTodayLog(req.userId, roadmap._id, progress);
-
+    if (progress === 100) {
+        await assignBadge(req.userId, "🎯 Roadmap Finisher");
+    }
     return res.json({ roadmap: withProgress(roadmap) });
   } catch (err) {
     console.error("toggleStep error:", err);

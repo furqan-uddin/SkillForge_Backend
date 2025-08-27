@@ -5,6 +5,7 @@ import mammoth from "mammoth";
 import Groq from "groq-sdk";
 import User from "../models/User.js";
 import { jsonrepair } from "jsonrepair";
+import { assignBadge } from "./profileController.js";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -170,12 +171,184 @@ Make all suggestions specific, concise, and directly actionable (avoid vague adv
     }
 
     if (userId) {
-      await User.findByIdAndUpdate(userId, { resumeScore: score });
+      await User.findByIdAndUpdate(userId, {      
+        resumeScore: score,
+        resumeText: extractedText, // 🔹 Save resume text centrally
+      });
+      if (score >= 80) await assignBadge(userId, "📄 Strong Resume");
+      if (score >= 95) await assignBadge(userId, "🏆 Resume Master");
     }
 
     res.json({ score, suggestions: suggestionsArray });
   } catch (error) {
     console.error("Groq Resume Error:", error);
     res.status(500).json({ error: "Failed to analyze resume" });
+  }
+};
+
+
+
+export const matchResumeWithJD = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user || !user.resumeText) {
+      return res.status(400).json({
+        message: "No resume found. Please upload resume in Resume Analyzer first.",
+      });
+    }
+
+    const { jdText } = req.body;
+    if (!jdText) {
+      return res.status(400).json({ message: "Job description is required" });
+    }
+
+    const prompt = `
+      Compare this resume with the job description.
+      Return JSON with:
+      {
+        "matchScore": number (0-100),
+        "missingKeywords": string[],
+        "suggestions": string[]
+      }
+      Resume: ${user.resumeText}
+      Job Description: ${jdText}
+    `;
+
+    const response = await groq.chat.completions.create({
+      model: "llama3-70b-8192",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const raw = response.choices[0].message.content;
+    const data = JSON.parse(jsonrepair(raw));
+
+    if (typeof data.matchScore !== "number") data.matchScore = 0;
+    if (!Array.isArray(data.missingKeywords)) data.missingKeywords = [];
+    if (!Array.isArray(data.suggestions)) data.suggestions = [];
+
+    return res.json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export const generateInterviewQuestions = async (req, res, next) => {
+  try {
+    const { role } = req.body;
+    if (!role) return res.status(400).json({ message: "Role is required" });
+
+    const prompt = `
+      Generate 10 mock interview questions for role: ${role}.
+      Format JSON: { "questions": [ "Q1", "Q2", ... ] }
+    `;
+
+    const response = await groq.chat.completions.create({
+      model: "llama3-70b-8192",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const raw = response.choices[0].message.content;
+    const data = JSON.parse(jsonrepair(raw));
+    if (!Array.isArray(data.questions)) data.questions = [];
+
+    return res.json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const analyzeSkillGap = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user || !user.resumeText) {
+      return res.status(400).json({
+        message: "No resume found. Please upload resume in Resume Analyzer first.",
+      });
+    }
+
+    let { interests } = req.body;
+
+    if (!Array.isArray(interests)) {
+      if (typeof interests === "string") {
+        interests = interests.split(",").map((s) => s.trim()).filter(Boolean);
+      } else {
+        interests = [];
+      }
+    }
+
+    const prompt = `
+      Compare resume skills with these interests: ${interests.join(", ") || "N/A"}.
+      Return JSON:
+      {
+        "missingSkills": [ ... ],
+        "resources": [ { "skill": string, "link": string } ]
+      }
+      Resume: ${user.resumeText}
+    `;
+
+    const response = await groq.chat.completions.create({
+      model: "llama3-70b-8192",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const raw = response.choices[0].message.content;
+    let data = {};
+
+    try {
+      data = JSON.parse(jsonrepair(raw));
+    } catch (err) {
+      console.error("Skill Gap JSON parse failed:", err);
+      data = { missingSkills: [], resources: [] };
+    }
+
+    if (!Array.isArray(data.missingSkills)) data.missingSkills = [];
+    if (!Array.isArray(data.resources)) data.resources = [];
+
+    return res.json(data);
+  } catch (error) {
+    console.error("Skill Gap Error:", error);
+    next(error);
+  }
+};
+
+
+export const getCareerInsights = async (req, res, next) => {
+  try {
+    const { resumeScore, interests, streaks, progress } = req.body;
+
+    const prompt = `
+      Based on profile:
+      Resume Score: ${resumeScore}
+      Interests: ${interests}
+      Streaks: ${streaks}
+      Progress: ${progress}
+      
+      Suggest 2-3 career paths, relevant certifications, and priority skills.
+      Return JSON: {
+        "roles": [ ... ],
+        "certifications": [ ... ],
+        "prioritySkills": [ ... ]
+      }
+    `;
+
+    const response = await groq.chat.completions.create({
+      model: "llama3-70b-8192",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+    });
+
+    const raw = response.choices[0].message.content;
+    const data = JSON.parse(jsonrepair(raw));
+    if (!Array.isArray(data.roles)) data.roles = [];
+if (!Array.isArray(data.certifications)) data.certifications = [];
+if (!Array.isArray(data.prioritySkills)) data.prioritySkills = [];
+
+    return res.json(data);
+  } catch (error) {
+    next(error);
   }
 };

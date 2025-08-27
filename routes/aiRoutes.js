@@ -2,7 +2,7 @@
 import express from "express";
 import multer from "multer";
 import authMiddleware from "../middlewares/authMiddleware.js";
-import { analyzeResume, generateRoadmap } from "../controllers/aiController.js";
+import { analyzeResume, generateRoadmap, analyzeSkillGap, generateInterviewQuestions, getCareerInsights,matchResumeWithJD } from "../controllers/aiController.js";
 
 const router = express.Router();
 
@@ -36,5 +36,10 @@ const upload = multer({
 
 router.post("/generate-roadmap", authMiddleware, generateRoadmap);
 router.post("/analyze-resume", authMiddleware, upload.single("file"), analyzeResume);
+router.post("/match-jd", authMiddleware, matchResumeWithJD);
+router.post("/interview", authMiddleware, generateInterviewQuestions);
+router.post("/skill-gap", authMiddleware, analyzeSkillGap);
+router.post("/insights", authMiddleware, getCareerInsights);
+
 
 export default router;

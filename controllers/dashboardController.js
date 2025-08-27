@@ -2,6 +2,7 @@
 import Roadmap from "../models/Roadmap.js";
 import User from "../models/User.js";
 import ProgressLog from "../models/ProgressLog.js";
+import { assignBadge } from "./profileController.js";
 
 export const getDashboard = async (req, res) => {
   try {
@@ -35,6 +36,8 @@ export const getDashboard = async (req, res) => {
       }
     }
     longest = Math.max(longest, current);
+    if (longest >= 7) await assignBadge(req.userId, "🔥 7-Day Streak");
+    if (longest >= 30) await assignBadge(req.userId, "🔥 30-Day Streak");
 
     res.json({
       resumeScore: user?.resumeScore || 0,
