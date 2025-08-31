@@ -34,7 +34,7 @@ export const generateRoadmap = async (req, res) => {
     `;
 
     const completion = await groq.chat.completions.create({
-      model: "llama3-8b-8192",
+      model: "llama-3.1-8b-instant",
       messages: [
         {
           role: "system",
@@ -110,7 +110,7 @@ export const analyzeResume = async (req, res) => {
     }
 
     const completion = await groq.chat.completions.create({
-      model: "llama3-8b-8192",
+      model: "llama-3.1-8b-instant",
       messages: [
         {
           role: "system",
@@ -213,7 +213,7 @@ export const matchResumeWithJD = async (req, res, next) => {
     `;
 
     const response = await groq.chat.completions.create({
-      model: "llama3-70b-8192",
+      model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
@@ -252,7 +252,7 @@ export const generateInterviewQuestions = async (req, res, next) => {
       `;
 
     const response = await groq.chat.completions.create({
-      model: "llama3-70b-8192",
+      model: "llama-3.3-70b-versatile",
       messages: [
         {
           role: "system",
@@ -365,7 +365,7 @@ export const analyzeSkillGap = async (req, res, next) => {
     `;
 
     const response = await groq.chat.completions.create({
-      model: "llama3-70b-8192",
+      model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });
@@ -411,7 +411,7 @@ export const getCareerInsights = async (req, res, next) => {
     `;
 
     const response = await groq.chat.completions.create({
-      model: "llama3-70b-8192",
+      model: "llama-3.3-70b-versatile",
       messages: [
         {
           role: "system",
