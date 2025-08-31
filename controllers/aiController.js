@@ -56,9 +56,13 @@ User interests: ${interests.join(", ")}
       console.warn("AI response invalid, attempting repair...");
       roadmaps = JSON.parse(jsonrepair(aiResponse));
     }
-
+    
+    const normalized = {};
+    Object.keys(roadmaps).forEach((k) => {
+      normalized[k.toLowerCase().trim()] = roadmaps[k];
+    });
     // ✅ Schema validation
-    Object.values(roadmaps).forEach((weeks) => {
+    Object.values(normalized).forEach((weeks) => {
       for (const [week, steps] of Object.entries(weeks)) {
         if (!Array.isArray(steps) || steps.length !== 4) {
           throw new Error(`Invalid roadmap format at ${week}`);
@@ -68,7 +72,7 @@ User interests: ${interests.join(", ")}
 
     await User.findByIdAndUpdate(req.userId, { roadmapProgress: 10 });
 
-    res.json({ roadmaps, progress: 10 });
+    res.json({ roadmaps: normalized, progress: 10 });
   } catch (error) {
     console.error("Groq Roadmap Error:", error);
     res.status(500).json({ error: "Failed to generate roadmap" });
@@ -321,34 +325,85 @@ export const getCareerInsights = async (req, res, next) => {
     const { resumeScore, interests, streaks, progress } = req.body;
 
     const prompt = `
-      Based on profile:
-      Resume Score: ${resumeScore}
-      Interests: ${interests}
-      Streaks: ${streaks}
-      Progress: ${progress}
-      
-      Suggest 2-3 career paths, relevant certifications, and priority skills.
-      Return JSON: {
-        "roles": [ ... ],
-        "certifications": [ ... ],
-        "prioritySkills": [ ... ]
-      }
-    `;
+Based on profile:
+Resume Score: ${resumeScore}
+Interests: ${Array.isArray(interests) ? interests.join(", ") : interests}
+Streaks: ${streaks}
+Progress: ${progress}
+
+Suggest 2-3 career paths, relevant certifications (with provider), and priority skills.
+IMPORTANT: Return ONLY valid JSON in this exact format:
+{
+  "roles": [ { "role": "Software Engineer", "description": "..." } ],
+  "certifications": [ { "certification": "AWS Cloud Practitioner", "provider": "AWS" } ],
+  "prioritySkills": [ "JavaScript", "System Design" ]
+}`;
 
     const response = await groq.chat.completions.create({
       model: "llama3-70b-8192",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a strict JSON generator. Respond ONLY with valid JSON matching the schema, no extra text or comments."
+        },
+        { role: "user", content: prompt }
+      ]
     });
 
-    const raw = response.choices[0].message.content;
-    const data = JSON.parse(jsonrepair(raw));
-    if (!Array.isArray(data.roles)) data.roles = [];
-if (!Array.isArray(data.certifications)) data.certifications = [];
-if (!Array.isArray(data.prioritySkills)) data.prioritySkills = [];
+    const raw = response.choices?.[0]?.message?.content;
+    if (!raw) {
+      return res.status(502).json({ error: "No response from AI service" });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      try {
+        parsed = JSON.parse(jsonrepair(raw));
+      } catch (err) {
+        console.error("CareerInsights JSON parse failed:", err);
+        return res.status(502).json({ error: "Failed to parse AI response" });
+      }
+    }
+
+    // Normalize schema
+    const data = {
+      roles: Array.isArray(parsed.roles)
+        ? parsed.roles.map((r) =>
+            typeof r === "string"
+              ? { role: r, description: "" }
+              : { role: r.role || String(r), description: r.description || "" }
+          )
+        : [],
+      certifications: Array.isArray(parsed.certifications)
+        ? parsed.certifications.map((c) =>
+            typeof c === "string"
+              ? { certification: c, provider: "" }
+              : {
+                  certification: c.certification || String(c),
+                  provider: c.provider || ""
+                }
+          )
+        : [],
+      prioritySkills: Array.isArray(parsed.prioritySkills)
+        ? parsed.prioritySkills.map((s) => String(s))
+        : []
+    };
+
+    const isEmpty =
+      data.roles.length === 0 &&
+      data.certifications.length === 0 &&
+      data.prioritySkills.length === 0;
+
+    if (isEmpty) {
+      return res.status(502).json({ error: "AI did not return valid insights. Please try again." });
+    }
 
     return res.json(data);
   } catch (error) {
+    console.error("Career Insights Error:", error);
     next(error);
   }
 };
