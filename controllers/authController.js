@@ -3,7 +3,7 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-// ✅ Register
+// Register
 export const registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -27,14 +27,16 @@ export const registerUser = async (req, res) => {
   }
 };
 
-// ✅ Login
+// Login
 export const loginUser = async (req, res) => {
   const email = req.body.email?.trim();
   const password = req.body.password?.trim();
 
   try {
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
     }
 
     const user = await User.findOne({ email });
@@ -62,12 +64,14 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// ✅ Reset Password
+// Reset Password
 export const resetPassword = async (req, res) => {
   try {
     const { email, newPassword } = req.body;
     if (!email || !newPassword) {
-      return res.status(400).json({ message: "Email and new password required" });
+      return res
+        .status(400)
+        .json({ message: "Email and new password required" });
     }
 
     const user = await User.findOne({ email });
@@ -84,50 +88,3 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-// ✅ Save Career Interests
-export const saveInterests = async (req, res) => {
-  try {
-    let { interests } = req.body;
-
-    if (!Array.isArray(interests)) {
-      return res.status(400).json({ message: "Interests must be an array" });
-    }
-
-    interests = [
-      ...new Set(
-        interests
-          .map((i) => i.trim())
-          .filter((i) => i.length >= 3 && i.length <= 50 && /^[a-zA-Z\s\-\&]+$/.test(i))
-      ),
-    ];
-
-    if (interests.length > 10) {
-      return res.status(400).json({ message: "Maximum 10 interests allowed" });
-    }
-
-    const user = await User.findByIdAndUpdate(req.userId, { interests }, { new: true });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({ message: "✅ Interests saved successfully", interests: user.interests });
-  } catch (error) {
-    console.error("Error saving interests:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// ✅ Get Career Interests
-export const getInterests = async (req, res) => {
-  try {
-    const user = await User.findById(req.userId).select("interests");
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.json({ interests: user.interests || [] });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-

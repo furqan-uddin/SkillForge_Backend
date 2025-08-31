@@ -6,25 +6,11 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-
-  // ✅ Already existing field
-  interests: { type: [String], default: [] },
-
-  // ✅ NEW fields for Profile
   profilePic: { type: String, default: "" }, // Will store URL only
-
-  // ✅ NEW fields for Dashboard progress
+  resumeText: { type: String, default: "" },
   resumeScore: { type: Number, default: 0 },
-  // roadmapProgress: { type: Number, default: 0 }
-  badges: {
-    type: [String],
-    default: []
-  },
-  resumeText: {
-    type: String,
-    default: "",
-  },
-
+  interests: { type: [String], default: [] },
+  badges: { type: [String], default: [] },
 });
 
 // ✅ Hash password before saving

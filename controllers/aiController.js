@@ -9,9 +9,7 @@ import { assignBadge } from "./profileController.js";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// ✅ AI Roadmap Generator
-// ✅ Optimized AI Roadmap Generator (Detailed + JSON strict)
-
+//AI Roadmap Generator
 export const generateRoadmap = async (req, res) => {
   const { interests } = req.body;
 
@@ -21,19 +19,19 @@ export const generateRoadmap = async (req, res) => {
     }
 
     const prompt = `
-You are an expert career mentor. Create a detailed learning roadmap for each user interest.
-- Each roadmap must cover at least 6 weeks.
-- Each week should have exactly 4 learning steps (clear, actionable, increasing depth).
-- Output ONLY valid JSON (no markdown, no comments, no text).
-Format:
-{
-  "Interest Name": {
-    "Week 1": ["Step 1", "Step 2", "Step 3", "Step 4"],
-    "Week 2": ["Step 1", "Step 2", "Step 3", "Step 4"]
-  }
-}
-User interests: ${interests.join(", ")}
-`;
+      You are an expert career mentor. Create a detailed learning roadmap for each user interest.
+      - Each roadmap must cover at least 6 weeks.
+      - Each week should have exactly 4 learning steps (clear, actionable, increasing depth).
+      - Output ONLY valid JSON (no markdown, no comments, no text).
+      Format:
+      {
+        "Interest Name": {
+          "Week 1": ["Step 1", "Step 2", "Step 3", "Step 4"],
+          "Week 2": ["Step 1", "Step 2", "Step 3", "Step 4"]
+        }
+      }
+      User interests: ${interests.join(", ")}
+    `;
 
     const completion = await groq.chat.completions.create({
       model: "llama3-8b-8192",
@@ -56,12 +54,13 @@ User interests: ${interests.join(", ")}
       console.warn("AI response invalid, attempting repair...");
       roadmaps = JSON.parse(jsonrepair(aiResponse));
     }
-    
+
     const normalized = {};
     Object.keys(roadmaps).forEach((k) => {
       normalized[k.toLowerCase().trim()] = roadmaps[k];
     });
-    // ✅ Schema validation
+
+    //  Schema validation
     Object.values(normalized).forEach((weeks) => {
       for (const [week, steps] of Object.entries(weeks)) {
         if (!Array.isArray(steps) || steps.length !== 4) {
@@ -79,9 +78,6 @@ User interests: ${interests.join(", ")}
   }
 };
 
-
-
-
 // ✅ Resume Analyzer (fixed PDF extraction)
 export const analyzeResume = async (req, res) => {
   let extractedText = "";
@@ -96,7 +92,8 @@ export const analyzeResume = async (req, res) => {
         const pdfData = await pdfParse(dataBuffer);
         extractedText = pdfData.text || "";
       } else if (
-        req.file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        req.file.mimetype ===
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         req.file.mimetype === "application/msword"
       ) {
         const result = await mammoth.extractRawText({ path: filePath });
@@ -112,32 +109,30 @@ export const analyzeResume = async (req, res) => {
       return res.status(400).json({ message: "No resume text found!" });
     }
 
-    // 🔹 Force AI to return valid JSON (score + suggestions[])
     const completion = await groq.chat.completions.create({
       model: "llama3-8b-8192",
       messages: [
         {
           role: "system",
           content: `You are an expert resume reviewer.
-Respond ONLY in valid JSON format with the structure:
-{
-  "score": <number between 0-100>,
-  "suggestions": [
-    "Use measurable achievements (e.g., increased sales by 20%).",
-    "Tailor keywords to match the target job description.",
-    "Shorten lengthy sentences for readability."
-  ]
-}
+            Respond ONLY in valid JSON format with the structure:
+            {
+              "score": <number between 0-100>,
+              "suggestions": [
+                "Use measurable achievements (e.g., increased sales by 20%).",
+                "Tailor keywords to match the target job description.",
+                "Shorten lengthy sentences for readability."
+              ]
+            }
+            Scoring criteria:
+            - Clarity & readability
+            - Use of strong action verbs
+            - Quantifiable impact (numbers, percentages, metrics)
+            - Relevance to target role
+            - Overall structure & formatting
 
-Scoring criteria:
-- Clarity & readability
-- Use of strong action verbs
-- Quantifiable impact (numbers, percentages, metrics)
-- Relevance to target role
-- Overall structure & formatting
-
-Make all suggestions specific, concise, and directly actionable (avoid vague advice).`
-
+            Make all suggestions specific, concise, and directly actionable (avoid vague advice).
+          `,
         },
         { role: "user", content: extractedText },
       ],
@@ -175,9 +170,9 @@ Make all suggestions specific, concise, and directly actionable (avoid vague adv
     }
 
     if (userId) {
-      await User.findByIdAndUpdate(userId, {      
+      await User.findByIdAndUpdate(userId, {
         resumeScore: score,
-        resumeText: extractedText, // 🔹 Save resume text centrally
+        resumeText: extractedText,
       });
       if (score >= 80) await assignBadge(userId, "📄 Strong Resume");
       if (score >= 95) await assignBadge(userId, "🏆 Resume Master");
@@ -190,14 +185,13 @@ Make all suggestions specific, concise, and directly actionable (avoid vague adv
   }
 };
 
-
-
 export const matchResumeWithJD = async (req, res, next) => {
   try {
     const user = await User.findById(req.userId);
     if (!user || !user.resumeText) {
       return res.status(400).json({
-        message: "No resume found. Please upload resume in Resume Analyzer first.",
+        message:
+          "No resume found. Please upload resume in Resume Analyzer first.",
       });
     }
 
@@ -237,29 +231,100 @@ export const matchResumeWithJD = async (req, res, next) => {
   }
 };
 
-
 export const generateInterviewQuestions = async (req, res, next) => {
   try {
     const { role } = req.body;
     if (!role) return res.status(400).json({ message: "Role is required" });
 
+    // console.log(`[Interview] Request received for role: "${role}" (user: ${req.userId || "unknown"})`);
+
     const prompt = `
-      Generate 10 mock interview questions for role: ${role}.
-      Format JSON: { "questions": [ "Q1", "Q2", ... ] }
-    `;
+      Generate 15 mock interview questions for the role: ${role}.
+      For each question, also provide a concise model answer.
+      And try to give different question each time.
+      Return ONLY valid JSON in this exact format:
+      {
+        "questions": [
+          { "question": "Q1 text here", "answer": "Answer text here" },
+          { "question": "Q2 text here", "answer": "Answer text here" }
+        ]
+      }
+      `;
 
     const response = await groq.chat.completions.create({
       model: "llama3-70b-8192",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a strict JSON generator. Reply only with valid JSON matching the requested schema.",
+        },
+        { role: "user", content: prompt },
+      ],
     });
 
-    const raw = response.choices[0].message.content;
-    const data = JSON.parse(jsonrepair(raw));
-    if (!Array.isArray(data.questions)) data.questions = [];
+    const raw = response?.choices?.[0]?.message?.content;
+    // console.log("[Interview] Raw AI response:", raw?.slice ? raw.slice(0, 2000) : raw);
 
-    return res.json(data);
+    if (!raw) {
+      console.error("[Interview] No content returned from AI for role:", role);
+      return res.status(502).json({ error: "No response from AI service" });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err1) {
+      try {
+        parsed = JSON.parse(jsonrepair(raw));
+      } catch (err2) {
+        console.error(
+          "[Interview] Failed to parse AI output (raw):",
+          err1,
+          err2
+        );
+        return res.status(502).json({ error: "Failed to parse AI response" });
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      console.error("[Interview] Parsed AI output is not an object:", parsed);
+      return res.status(502).json({ error: "Invalid AI response structure" });
+    }
+
+    if (!Array.isArray(parsed.questions)) parsed.questions = [];
+
+    // Normalize shape: ensure each item is { question, answer }
+    const normalized = parsed.questions
+      .map((q) =>
+        typeof q === "string"
+          ? { question: q, answer: "" }
+          : {
+              question:
+                q && (q.question ?? q.q ?? q.prompt)
+                  ? String(q.question ?? q.q ?? q.prompt)
+                  : "",
+              answer:
+                q && (q.answer ?? q.a ?? q.response)
+                  ? String(q.answer ?? q.a ?? q.response)
+                  : "",
+            }
+      )
+      .filter((item) => item.question && item.question.trim().length > 0); 
+
+    if (!normalized.length) {
+      console.error(
+        "[Interview] AI returned zero valid questions after normalization for role:",
+        role
+      );
+      return res
+        .status(502)
+        .json({ error: "AI returned no valid questions. Try again." });
+    }
+
+    return res.json({ questions: normalized });
   } catch (error) {
+    console.error("generateInterviewQuestions error:", error);
     next(error);
   }
 };
@@ -269,7 +334,8 @@ export const analyzeSkillGap = async (req, res, next) => {
     const user = await User.findById(req.userId);
     if (!user || !user.resumeText) {
       return res.status(400).json({
-        message: "No resume found. Please upload resume in Resume Analyzer first.",
+        message:
+          "No resume found. Please upload resume in Resume Analyzer first.",
       });
     }
 
@@ -277,14 +343,19 @@ export const analyzeSkillGap = async (req, res, next) => {
 
     if (!Array.isArray(interests)) {
       if (typeof interests === "string") {
-        interests = interests.split(",").map((s) => s.trim()).filter(Boolean);
+        interests = interests
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
       } else {
         interests = [];
       }
     }
 
     const prompt = `
-      Compare resume skills with these interests: ${interests.join(", ") || "N/A"}.
+      Compare resume skills with these interests: ${
+        interests.join(", ") || "N/A"
+      }.
       Return JSON:
       {
         "missingSkills": [ ... ],
@@ -319,25 +390,25 @@ export const analyzeSkillGap = async (req, res, next) => {
   }
 };
 
-
 export const getCareerInsights = async (req, res, next) => {
   try {
     const { resumeScore, interests, streaks, progress } = req.body;
 
     const prompt = `
-Based on profile:
-Resume Score: ${resumeScore}
-Interests: ${Array.isArray(interests) ? interests.join(", ") : interests}
-Streaks: ${streaks}
-Progress: ${progress}
+      Based on profile:
+      Resume Score: ${resumeScore}
+      Interests: ${Array.isArray(interests) ? interests.join(", ") : interests}
+      Streaks: ${streaks}
+      Progress: ${progress}
 
-Suggest 2-3 career paths, relevant certifications (with provider), and priority skills.
-IMPORTANT: Return ONLY valid JSON in this exact format:
-{
-  "roles": [ { "role": "Software Engineer", "description": "..." } ],
-  "certifications": [ { "certification": "AWS Cloud Practitioner", "provider": "AWS" } ],
-  "prioritySkills": [ "JavaScript", "System Design" ]
-}`;
+      Suggest 2-3 career paths, relevant certifications (with provider), and priority skills.
+      IMPORTANT: Return ONLY valid JSON in this exact format:
+      {
+        "roles": [ { "role": "Software Engineer", "description": "..." } ],
+        "certifications": [ { "certification": "AWS Cloud Practitioner", "provider": "AWS" } ],
+        "prioritySkills": [ "JavaScript", "System Design" ]
+      }
+    `;
 
     const response = await groq.chat.completions.create({
       model: "llama3-70b-8192",
@@ -345,10 +416,10 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
         {
           role: "system",
           content:
-            "You are a strict JSON generator. Respond ONLY with valid JSON matching the schema, no extra text or comments."
+            "You are a strict JSON generator. Respond ONLY with valid JSON matching the schema, no extra text or comments.",
         },
-        { role: "user", content: prompt }
-      ]
+        { role: "user", content: prompt },
+      ],
     });
 
     const raw = response.choices?.[0]?.message?.content;
@@ -383,13 +454,13 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
               ? { certification: c, provider: "" }
               : {
                   certification: c.certification || String(c),
-                  provider: c.provider || ""
+                  provider: c.provider || "",
                 }
           )
         : [],
       prioritySkills: Array.isArray(parsed.prioritySkills)
         ? parsed.prioritySkills.map((s) => String(s))
-        : []
+        : [],
     };
 
     const isEmpty =
@@ -398,7 +469,9 @@ IMPORTANT: Return ONLY valid JSON in this exact format:
       data.prioritySkills.length === 0;
 
     if (isEmpty) {
-      return res.status(502).json({ error: "AI did not return valid insights. Please try again." });
+      return res
+        .status(502)
+        .json({ error: "AI did not return valid insights. Please try again." });
     }
 
     return res.json(data);

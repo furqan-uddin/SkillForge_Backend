@@ -8,20 +8,24 @@ const StepSchema = new mongoose.Schema({
 });
 
 const WeekSchema = new mongoose.Schema({
-  title: { type: String, required: true }, // e.g., "Week 1"
-  steps: { type: [StepSchema], default: [] }, // exactly 4 per your AI format
+  title: { type: String, required: true },
+  steps: { type: [StepSchema], default: [] },
 });
 
 const RoadmapSchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true, required: true },
-    interest: { type: String, required: true }, // e.g., "Full Stack Development"
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+      required: true,
+    },
+    interest: { type: String, required: true },
     weeks: { type: [WeekSchema], default: [] },
   },
   { timestamps: true }
 );
 
-// helper (not virtual) to compute % done
 RoadmapSchema.methods.progressPercent = function () {
   const total = this.weeks.reduce((acc, w) => acc + w.steps.length, 0);
   if (!total) return 0;

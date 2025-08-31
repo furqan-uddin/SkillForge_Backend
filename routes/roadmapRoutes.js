@@ -7,7 +7,7 @@ import {
   getRoadmapById,
   toggleStep,
   getProgressLogs,
-  getStreaks,
+  // getStreaks,
   deleteRoadmap,
 } from "../controllers/roadmapController.js";
 
@@ -15,14 +15,12 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.post("/", createOrReplaceRoadmap);           // save/replace by interest
-router.get("/", getUserRoadmaps);                   // list user roadmaps
-router.get("/streak", getStreaks);                  // motivational streaks
-
-router.get("/:id", getRoadmapById);                 // single roadmap
-// ADD THIS
+router.post("/", createOrReplaceRoadmap); 
+router.get("/", getUserRoadmaps); 
+// router.get("/streak", getStreaks); 
+router.get("/:id", getRoadmapById); 
 router.delete("/:id", deleteRoadmap);
-router.patch("/:id/step", toggleStep);              // toggle a step completed
-router.get("/:id/logs", getProgressLogs);           // logs for charts
+router.patch("/:id/step", toggleStep);
+router.get("/:id/logs", getProgressLogs); 
 
 export default router;

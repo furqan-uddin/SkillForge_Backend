@@ -23,19 +23,18 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 app.use(cors());
 app.use(express.json());
 
-// ✅ Routes
+//Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-app.use("/api", aiRoutes); // ✅ All AI routes prefixed with /api
-app.use("/api/roadmaps", roadmapRoutes); // ✅ NEW: roadmap persistence & progress
-
+app.use("/api", aiRoutes); 
+app.use("/api/roadmaps", roadmapRoutes);
 
 // Error handling
 app.use(notFound);
 app.use(errorHandler);
 
-// ✅ Connect DB & Start Server
+// Connect DB & Start Server
 const PORT = process.env.PORT || 5000;
 // start server after DB connect
 mongoose
