@@ -20,7 +20,11 @@ const app = express();
 app.use(helmet());
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
 
-app.use(cors());
+app.use(cors({
+  origin: ["https://skill-forge-bice-seven.vercel.app"],
+  credentials: true
+}));
+
 app.use(express.json());
 
 //Routes
