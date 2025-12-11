@@ -167,11 +167,13 @@ The backend is deployed on Render:
 https://skillforge-backend-qc22.onrender.com
 Make sure to configure environment variables in Render dashboard.
 
+
 ---
-## 🙌 Author
 
-Mohammad Furqanuddin
+## 🧑‍💻 Author
 
-🔗 LinkedIn: https://www.linkedin.com/in/mohammadfurqanuddin
-
+**Mohammad Furqanuddin**  
+🔗 LinkedIn: https://www.linkedin.com/in/mohammadfurqanuddin  
 📧 Email: mohammedfurqan2108@gmail.com
+
+
